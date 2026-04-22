@@ -39,7 +39,8 @@ jobs:
             asset_suffix: macos-aarch64
             archive_ext: tar.gz
             binary_name: update-sync
-          - os: macos-13
+          # Intel x86_64: macos-13 was retired; use macos-15-intel (see GitHub runner-images changelog).
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             label: macOS Intel
             asset_suffix: macos-x86_64
