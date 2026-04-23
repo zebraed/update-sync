@@ -100,7 +100,7 @@ fn run_sync(
 ) -> Result<()> {
     let source = canonicalize(source)
         .with_context(|| format!("failed to resolve source path: {}", source.display()))?;
-    let target = canonicalize(target)
+    let target = resolve_path_allow_missing(target)
         .with_context(|| format!("failed to resolve target path: {}", target.display()))?;
 
     let src_gitignore = build_gitignore_for_root(&source, ignore_files)?;
@@ -159,6 +159,21 @@ fn resolve_ignore_path(ignore_file: &Path) -> Result<PathBuf> {
         .with_context(|| format!("could not resolve gitignore path {}", path.display()))
 }
 
+fn resolve_path_allow_missing(path: &Path) -> Result<PathBuf> {
+    if path.exists() {
+        return canonicalize(path)
+            .with_context(|| format!("could not resolve path {}", path.display()));
+    }
+
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+
+    Ok(std::env::current_dir()
+        .with_context(|| "failed to get current directory")?
+        .join(path))
+}
+
 fn ignored_by_gitignore(gi: Option<&Gitignore>, root: &Path, path: &Path, is_dir: bool) -> bool {
     let Some(gi) = gi else {
         return false;
@@ -171,6 +186,13 @@ fn ignored_by_gitignore(gi: Option<&Gitignore>, root: &Path, path: &Path, is_dir
 }
 
 fn build_snapshot(root: &Path, gitignore: Option<&Gitignore>) -> Result<Snapshot> {
+    if !root.exists() {
+        return Ok(Snapshot {
+            dirs: HashSet::new(),
+            file_mtime: HashMap::new(),
+        });
+    }
+
     let mut dirs = HashSet::new();
     let mut file_mtime = HashMap::new();
 
@@ -513,5 +535,35 @@ mod tests {
             snap.file_mtime
                 .contains_key(&PathBuf::from("any").join("x.txt"))
         );
+    }
+
+    #[test]
+    fn snapshot_for_missing_target_is_empty() {
+        let tmp = tempdir().expect("tempdir");
+        let missing = tmp.path().join("missing-target");
+        let snap = build_snapshot(&missing, None).expect("snapshot");
+        assert!(snap.dirs.is_empty());
+        assert!(snap.file_mtime.is_empty());
+    }
+
+    #[test]
+    fn run_sync_creates_missing_target_when_copying_new_files() {
+        let tmp = tempdir().expect("tempdir");
+        let source = tmp.path().join("source");
+        let target = tmp.path().join("target");
+        fs::create_dir_all(source.join("nested")).expect("create source dir");
+        File::create(source.join("nested").join("hello.txt")).expect("create source file");
+
+        let opts = SyncOptions {
+            overwrite: true,
+            new: true,
+            delete: true,
+            dry_run: false,
+            tolerance: Duration::from_secs(1),
+        };
+
+        run_sync(&source, &target, &opts, &[]).expect("sync succeeds");
+
+        assert!(target.join("nested").join("hello.txt").exists());
     }
 }
