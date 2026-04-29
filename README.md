@@ -1,4 +1,4 @@
-# update-sync
+# justsync
 
 A small CLI that performs **one-way sync** from a source directory to a target directory, based on file presence and last modified time (mtime).
 
@@ -30,7 +30,7 @@ cargo install --path .
 ## Usage
 
 ```text
-update-sync <SOURCE> <TARGET>
+justsync <SOURCE> <TARGET>
 ```
 
 By default: overwrite when the source file is newer, create missing files and directories, and delete extra files and directories on the target. For first runs or before applying changes, prefer **`--dry-run` (`-r`)**.
