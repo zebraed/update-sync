@@ -49,4 +49,4 @@ By default: overwrite when the source file is newer, create missing files and di
 
 ## License
 
-MIT — see `LICENSE`.
+[MIT License](LICENSE)
